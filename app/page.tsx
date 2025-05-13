@@ -16,7 +16,7 @@ export default function Home() {
     let poseLandmarker: PoseLandmarker | undefined = undefined;
     let runningMode: "IMAGE" | "VIDEO" = "IMAGE";
     let enableWebcamButton: HTMLButtonElement;
-    let webcamRunning: Boolean = false;
+    let webcamRunning = false;
     const videoHeight = "360px";
     const videoWidth = "480px";
 
@@ -56,6 +56,7 @@ export default function Home() {
     }
 
     // When an image is clicked, let's detect it and display results!
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function handleClick(event: any) {
       if (!poseLandmarker) {
         console.log("Wait for poseLandmarker to load before clicking!");
@@ -69,7 +70,7 @@ export default function Home() {
       // Remove all landmarks drawed before
       const allCanvas =
         event.target.parentNode.getElementsByClassName("canvas");
-      for (var i = allCanvas.length - 1; i >= 0; i--) {
+      for (let i = allCanvas.length - 1; i >= 0; i--) {
         const n = allCanvas[i];
         n.parentNode.removeChild(n);
       }
@@ -169,7 +170,7 @@ export default function Home() {
         runningMode = "VIDEO";
         await poseLandmarker?.setOptions({ runningMode: "VIDEO" });
       }
-      let startTimeMs = performance.now();
+      const startTimeMs = performance.now();
       if (lastVideoTime !== video.currentTime) {
         lastVideoTime = video.currentTime;
         poseLandmarker?.detectForVideo(video, startTimeMs, (result) => {
@@ -207,6 +208,7 @@ export default function Home() {
         </p>
 
         <div className="detectOnClick">
+          {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
           <img
             src="https://assets.codepen.io/9177687/woman-ge0f199f92_640.jpg"
             width="100%"
@@ -215,6 +217,7 @@ export default function Home() {
           />
         </div>
         <div className="detectOnClick">
+          {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
           <img
             src="https://assets.codepen.io/9177687/woman-g1af8d3deb_640.jpg"
             width="100%"
