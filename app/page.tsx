@@ -1,103 +1,259 @@
-import Image from "next/image";
+"use client";
+
+import { useLayoutEffect } from "react";
+import {
+  PoseLandmarker,
+  FilesetResolver,
+  DrawingUtils,
+} from "@mediapipe/tasks-vision";
+import "./home.css";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  useLayoutEffect(() => {
+    console.log("useEffect: DOM updated");
+    const demosSection = document.getElementById("demos")!;
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    let poseLandmarker: PoseLandmarker | undefined = undefined;
+    let runningMode: "IMAGE" | "VIDEO" = "IMAGE";
+    let enableWebcamButton: HTMLButtonElement;
+    let webcamRunning: Boolean = false;
+    const videoHeight = "360px";
+    const videoWidth = "480px";
+
+    // Before we can use PoseLandmarker class we must wait for it to finish
+    // loading. Machine Learning models can be large and take a moment to
+    // get everything needed to run.
+    const createPoseLandmarker = async () => {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+      );
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
+          delegate: "GPU",
+        },
+        runningMode: runningMode,
+        numPoses: 2,
+      });
+      demosSection.classList.remove("invisible");
+    };
+    createPoseLandmarker();
+
+    /********************************************************************
+// Demo 1: Grab a bunch of images from the page and detection them
+// upon click.
+********************************************************************/
+
+    // In this demo, we have put all our clickable images in divs with the
+    // CSS class 'detectionOnClick'. Lets get all the elements that have
+    // this class.
+    const imageContainers = document.getElementsByClassName("detectOnClick");
+
+    // Now let's go through all of these and add a click event listener.
+    for (let i = 0; i < imageContainers.length; i++) {
+      // Add event listener to the child element whichis the img element.
+      imageContainers[i].children[0].addEventListener("click", handleClick);
+    }
+
+    // When an image is clicked, let's detect it and display results!
+    async function handleClick(event: any) {
+      if (!poseLandmarker) {
+        console.log("Wait for poseLandmarker to load before clicking!");
+        return;
+      }
+
+      if (runningMode === "VIDEO") {
+        runningMode = "IMAGE";
+        await poseLandmarker.setOptions({ runningMode: "IMAGE" });
+      }
+      // Remove all landmarks drawed before
+      const allCanvas =
+        event.target.parentNode.getElementsByClassName("canvas");
+      for (var i = allCanvas.length - 1; i >= 0; i--) {
+        const n = allCanvas[i];
+        n.parentNode.removeChild(n);
+      }
+
+      // We can call poseLandmarker.detect as many times as we like with
+      // different image data each time. The result is returned in a callback.
+      poseLandmarker.detect(event.target, (result) => {
+        const canvas = document.createElement("canvas");
+        canvas.setAttribute("class", "canvas");
+        canvas.setAttribute("width", event.target.naturalWidth + "px");
+        canvas.setAttribute("height", event.target.naturalHeight + "px");
+        canvas.style =
+          "left: 0px;" +
+          "top: 0px;" +
+          "width: " +
+          event.target.width +
+          "px;" +
+          "height: " +
+          event.target.height +
+          "px;";
+
+        event.target.parentNode.appendChild(canvas);
+        const canvasCtx = canvas.getContext("2d")!;
+        const drawingUtils = new DrawingUtils(canvasCtx);
+        for (const landmark of result.landmarks) {
+          drawingUtils.drawLandmarks(landmark, {
+            radius: (data) => DrawingUtils.lerp(data.from!.z, -0.15, 0.1, 5, 1),
+          });
+          drawingUtils.drawConnectors(
+            landmark,
+            PoseLandmarker.POSE_CONNECTIONS
+          );
+        }
+      });
+    }
+
+    /********************************************************************
+// Demo 2: Continuously grab image from webcam stream and detect it.
+********************************************************************/
+
+    const video = document.getElementById("webcam") as HTMLVideoElement;
+    const canvasElement = document.getElementById(
+      "output_canvas"
+    ) as HTMLCanvasElement;
+    const canvasCtx = canvasElement.getContext("2d")!;
+    const drawingUtils = new DrawingUtils(canvasCtx);
+
+    // Check if webcam access is supported.
+    const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
+
+    // If webcam supported, add event listener to button for when user
+    // wants to activate it.
+    if (hasGetUserMedia()) {
+      enableWebcamButton = document.getElementById(
+        "webcamButton"
+      ) as HTMLButtonElement;
+      enableWebcamButton.addEventListener("click", enableCam);
+    } else {
+      console.warn("getUserMedia() is not supported by your browser");
+    }
+
+    // Enable the live webcam view and start detection.
+    function enableCam() {
+      if (!poseLandmarker) {
+        console.log("Wait! poseLandmaker not loaded yet.");
+        return;
+      }
+
+      if (webcamRunning === true) {
+        webcamRunning = false;
+        enableWebcamButton.innerText = "ENABLE PREDICTIONS";
+      } else {
+        webcamRunning = true;
+        enableWebcamButton.innerText = "DISABLE PREDICTIONS";
+      }
+
+      // getUsermedia parameters.
+      const constraints = {
+        video: true,
+      };
+
+      // Activate the webcam stream.
+      navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+        video.srcObject = stream;
+        video.addEventListener("loadeddata", predictWebcam);
+      });
+    }
+
+    let lastVideoTime = -1;
+    async function predictWebcam() {
+      canvasElement.style.height = videoHeight;
+      video.style.height = videoHeight;
+      canvasElement.style.width = videoWidth;
+      video.style.width = videoWidth;
+      // Now let's start detecting the stream.
+      if (runningMode === "IMAGE") {
+        runningMode = "VIDEO";
+        await poseLandmarker?.setOptions({ runningMode: "VIDEO" });
+      }
+      let startTimeMs = performance.now();
+      if (lastVideoTime !== video.currentTime) {
+        lastVideoTime = video.currentTime;
+        poseLandmarker?.detectForVideo(video, startTimeMs, (result) => {
+          canvasCtx.save();
+          canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+          for (const landmark of result.landmarks) {
+            drawingUtils.drawLandmarks(landmark, {
+              radius: (data) =>
+                DrawingUtils.lerp(data.from!.z, -0.15, 0.1, 5, 1),
+            });
+            drawingUtils.drawConnectors(
+              landmark,
+              PoseLandmarker.POSE_CONNECTIONS
+            );
+          }
+          canvasCtx.restore();
+        });
+      }
+
+      // Call this function again to keep predicting when the browser is ready.
+      if (webcamRunning === true) {
+        window.requestAnimationFrame(predictWebcam);
+      }
+    }
+  });
+
+  console.log("Rendering Component");
+
+  return (
+    <>
+      <section id="demos">
+        <h2>Demo: Detecting Images</h2>
+        <p>
+          <b>Click on an image below</b> to see the key landmarks of the body.
+        </p>
+
+        <div className="detectOnClick">
+          <img
+            src="https://assets.codepen.io/9177687/woman-ge0f199f92_640.jpg"
+            width="100%"
+            crossOrigin="anonymous"
+            title="Click to get detection!"
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <div className="detectOnClick">
+          <img
+            src="https://assets.codepen.io/9177687/woman-g1af8d3deb_640.jpg"
+            width="100%"
+            crossOrigin="anonymous"
+            title="Click to get detection!"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        </div>
+
+        <h2>Demo: Webcam continuous pose landmarks detection</h2>
+        <p>
+          Stand in front of your webcam to get real-time pose landmarker
+          detection.
+          <br />
+          Click <b>enable webcam</b> below and grant access to the webcam if
+          prompted.
+        </p>
+
+        <div id="liveView" className="videoView">
+          <button id="webcamButton" className="mdc-button mdc-button--raised">
+            <span className="mdc-button__ripple"></span>
+            <span className="mdc-button__label">ENABLE WEBCAM</span>
+          </button>
+          <div style={{ position: "relative" }}>
+            <video
+              id="webcam"
+              style={{ width: "1280px", height: "720px", position: "absolute" }}
+              autoPlay
+              playsInline
+            ></video>
+            <canvas
+              className="output_canvas"
+              id="output_canvas"
+              width="1280"
+              height="720"
+              style={{ position: "absolute", left: "0px", top: "0px" }}
+            ></canvas>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
