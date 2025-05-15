@@ -72,7 +72,7 @@ export default function Home() {
         enableWebcamButton.innerText = "ENABLE PREDICTIONS";
       } else {
         webcamRunning = true;
-        enableWebcamButton.innerText = "DISABLE PREDICTIONS";
+        enableWebcamButton.style.display = "none";
       }
 
       // getUsermedia parameters.
@@ -128,7 +128,7 @@ export default function Home() {
         <div id="liveView" className="videoView">
           <button id="webcamButton" className="mdc-button mdc-button--raised">
             <span className="mdc-button__ripple"></span>
-            <span className="mdc-button__label">ENABLE WEBCAM</span>
+            <span className="mdc-button__label">START DETECTION</span>
           </button>
           <div style={{ position: "relative" }}>
             <video
