@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import {
   PoseLandmarker,
   FilesetResolver,
@@ -9,10 +9,13 @@ import {
 import "./home.css";
 
 export default function Home() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const webcamButton = useRef<HTMLButtonElement>(null);
+
   useLayoutEffect(() => {
     console.log("useEffect: DOM updated");
     let poseLandmarker: PoseLandmarker | undefined = undefined;
-    let enableWebcamButton: HTMLButtonElement;
     let webcamRunning = false;
     const videoWidth = "1200px";
     const videoHeight = "900px";
@@ -39,10 +42,9 @@ export default function Home() {
     // Demo 2: Continuously grab image from webcam stream and detect it.
     ********************************************************************/
 
-    const video = document.getElementById("webcam") as HTMLVideoElement;
-    const canvasElement = document.getElementById(
-      "output_canvas"
-    ) as HTMLCanvasElement;
+    const video = videoRef.current!;
+    const canvasElement = canvasRef.current!;
+    const enableWebcamButton = webcamButton.current!;
     const canvasCtx = canvasElement.getContext("2d")!;
     const drawingUtils = new DrawingUtils(canvasCtx);
 
@@ -52,9 +54,6 @@ export default function Home() {
     // If webcam supported, add event listener to button for when user
     // wants to activate it.
     if (hasGetUserMedia()) {
-      enableWebcamButton = document.getElementById(
-        "webcamButton"
-      ) as HTMLButtonElement;
       enableWebcamButton.addEventListener("click", enableCam);
     } else {
       console.warn("getUserMedia() is not supported by your browser");
@@ -72,7 +71,8 @@ export default function Home() {
         enableWebcamButton.innerText = "ENABLE PREDICTIONS";
       } else {
         webcamRunning = true;
-        enableWebcamButton.style.display = "none";
+        enableWebcamButton.innerText = "";
+        // enableWebcamButton.style.display = "none";
       }
 
       // getUsermedia parameters.
@@ -97,6 +97,19 @@ export default function Home() {
       if (lastVideoTime !== video.currentTime) {
         lastVideoTime = video.currentTime;
         poseLandmarker?.detectForVideo(video, startTimeMs, (result) => {
+          if (result.landmarks && result.landmarks.length > 0) {
+            const keypoints = result.landmarks[0];
+
+            const leftHip = keypoints[23].y;
+            const leftKnee = keypoints[25].y;
+
+            if (leftHip > leftKnee - 0.05) {
+              enableWebcamButton.innerText = "✅ Squatting";
+            } else {
+              enableWebcamButton.innerText = "⬇️ Go Lower";
+            }
+          }
+
           canvasCtx.save();
           canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
           for (const landmark of result.landmarks) {
@@ -123,30 +136,22 @@ export default function Home() {
   console.log("Rendering Component");
 
   return (
-    <>
-      <section>
-        <div id="liveView" className="videoView">
-          <button id="webcamButton" className="mdc-button mdc-button--raised">
-            <span className="mdc-button__ripple"></span>
-            <span className="mdc-button__label">START DETECTION</span>
-          </button>
-          <div style={{ position: "relative" }}>
-            <video
-              id="webcam"
-              style={{ width: "1280px", height: "720px", position: "absolute" }}
-              autoPlay
-              playsInline
-            ></video>
-            <canvas
-              className="output_canvas"
-              id="output_canvas"
-              width="1280"
-              height="720"
-              style={{ position: "absolute", left: "0px", top: "0px" }}
-            ></canvas>
-          </div>
-        </div>
-      </section>
-    </>
+    <section>
+      <button ref={webcamButton}>START DETECTION</button>
+      <div className="relative">
+        <video
+          ref={videoRef}
+          className="absolute w-[1280px] h-[720px]"
+          autoPlay
+          playsInline
+        ></video>
+        <canvas
+          className="output_canvas absolute left-0 top-0"
+          ref={canvasRef}
+          width="1280"
+          height="720"
+        ></canvas>
+      </div>
+    </section>
   );
 }
